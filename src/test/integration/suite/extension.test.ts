@@ -163,7 +163,11 @@ export const tests: TestCase[] = [
     async fn() {
       const outcome = await api.controller.run(ids.FRONTEND);
       assert.ok(outcome.ok, outcome.message);
-      assert.strictEqual(terminalsNamed('FRONTEND').length, 1);
+      assert.strictEqual(
+        terminalsNamed('FRONTEND').length,
+        1,
+        `terminals now: ${vscode.window.terminals.map((t) => JSON.stringify(t.name)).join(', ')}`
+      );
       assert.ok(api.controller.isRunning(ids.FRONTEND));
       await waitFor(
         () => fs.existsSync(path.join(workspaceDir, 'frontend', 'frontend-ran.txt')),
@@ -306,6 +310,77 @@ export const tests: TestCase[] = [
       assert.ok(api.controller.list().some((t) => t.id === ids.GIT));
       assert.strictEqual(api.controller.snapshot().terminals.length, api.controller.list().length);
       await config.update('terminals', current, vscode.ConfigurationTarget.Workspace);
+    },
+  },
+
+  {
+    name: 'a terminal opened from the dropdown reports its real folder (tab subtext matches the terminal)',
+    async fn() {
+      if (process.platform !== 'win32' || classifyShell(vscode.env.shell).kind !== 'powershell') {
+        return; // the directory report is only needed (and only generated for PowerShell) on Windows
+      }
+      const profilesKey = `terminal.integrated.profiles.${profilePlatformKey()}`;
+      const real = (workspaceSettings()[profilesKey] as Record<string, any>)[`${PROFILE_PREFIX}FRONTEND`];
+      assert.ok(real, 'generated profile missing');
+
+      // Same profile with the directory report stripped out: the negative control.
+      const args: string[] = [...real.args];
+      const script = args[args.length - 1];
+      const stripped = script.replace(/\[Console\]::Write\(.*?\[string\]\[char\]7\)/, 'Write-Host');
+      assert.notStrictEqual(stripped, script, 'could not build the control profile');
+      const control = { ...real, args: [...args.slice(0, -1), stripped] };
+      const { overrideName: _ignored, ...withoutOverride } = real; // let the title follow the directory
+      const { overrideName: _ignored2, ...controlWithoutOverride } = control;
+
+      const platformKey = profilePlatformKey() as string; // short key, e.g. "windows"
+      const profiles = vscode.workspace.getConfiguration('terminal.integrated.profiles');
+      const tabs = vscode.workspace.getConfiguration('terminal.integrated.tabs');
+      const target = vscode.ConfigurationTarget.Workspace;
+      const existing = { ...(workspaceSettings()[profilesKey] as Record<string, unknown>) };
+      try {
+        // The tab text is `${cwdFolder}` - the same value VS Code puts in the small description next to the name.
+        await tabs.update('title', '${cwdFolder}', target);
+        await profiles.update(
+          platformKey,
+          { ...existing, TPCHECK: withoutOverride, TPCONTROL: controlWithoutOverride },
+          target
+        );
+
+        const before = new Set(vscode.window.terminals);
+        // VS Code refreshes its profile list asynchronously after a settings change, so retry briefly.
+        const openProfile = async (profileName: string) => {
+          const deadline = Date.now() + 20000;
+          for (;;) {
+            try {
+              await vscode.commands.executeCommand('workbench.action.terminal.newWithProfile', { profileName });
+              return;
+            } catch (error) {
+              if (Date.now() > deadline) {
+                throw error;
+              }
+              await new Promise((r) => setTimeout(r, 500));
+            }
+          }
+        };
+        await openProfile('TPCHECK');
+        await openProfile('TPCONTROL');
+        const opened = () => vscode.window.terminals.filter((t) => !before.has(t));
+
+        // Real profile: VS Code learns about the folder we changed into.
+        await waitFor(() => opened().some((t) => t.name === 'frontend'), 'the dropdown terminal to report the "frontend" folder', 30000);
+        // Control: without the report VS Code has no idea which folder the shell changed into, so it can only
+        // fall back to something generic (here the process name) - which is exactly the mismatch being fixed.
+        await waitFor(() => opened().length >= 2, 'the control terminal to open', 15000);
+        await new Promise((r) => setTimeout(r, 4000));
+        assert.ok(
+          opened().some((t) => t.name !== 'frontend'),
+          `control terminal unexpectedly knows the folder; saw: ${opened().map((t) => t.name).join(', ')}`
+        );
+      } finally {
+        await tabs.update('title', undefined, target);
+        await profiles.update(platformKey, existing, target);
+        vscode.window.terminals.filter((t) => t.name === 'frontend' || t.name === 'project').forEach((t) => t.dispose());
+      }
     },
   },
 

@@ -34,12 +34,31 @@ describe('classifyShell', () => {
 
 describe('buildProfileArgs', () => {
   it('changes directory, runs commands and stays interactive (PowerShell)', () => {
-    assert.deepEqual(buildProfileArgs(pwsh, 'D:\\it\'s\\app', ['npm run dev', 'git status'], 'win32'), [
-      '-NoLogo',
-      '-NoExit',
-      '-Command',
-      "Set-Location -LiteralPath 'D:\\it''s\\app'; npm run dev; git status",
-    ]);
+    const args = buildProfileArgs(pwsh, 'D:\\it\'s\\app', ['npm run dev', 'git status'], 'win32');
+    assert.ok(args);
+    assert.deepEqual(args.slice(0, 3), ['-NoLogo', '-NoExit', '-Command']);
+    const script = args[3];
+    assert.ok(script.startsWith("Set-Location -LiteralPath 'D:\\it''s\\app'; "), script);
+    assert.ok(script.endsWith('; npm run dev; git status'), script);
+  });
+
+  it('reports the new directory to VS Code so the tab does not show the workspace folder', () => {
+    const script = buildProfileArgs(pwsh, 'D:\\app', [], 'win32')?.[3] ?? '';
+    // escape sequence OSC 633;P;Cwd=<path>, with backslashes doubled as the protocol requires
+    assert.ok(script.includes("']633;P;Cwd='"), script);
+    assert.ok(script.includes(".Replace('\\','\\\\')"), 'backslashes must be escaped');
+    // it must come after the directory change, before any startup command
+    const setLocation = script.indexOf('Set-Location');
+    const report = script.indexOf('633;P;Cwd');
+    assert.ok(setLocation >= 0 && report > setLocation);
+  });
+
+  it('only reports the directory for Git Bash on Windows (Linux/macOS expose it natively)', () => {
+    const gitBash: ShellSpec = { path: 'C:\\Git\\bin\\bash.exe', args: ['--login', '-i'], kind: 'posix', name: 'bash' };
+    const onWindows = buildProfileArgs(gitBash, 'D:\\app', [], 'win32')?.join(' ') ?? '';
+    assert.ok(onWindows.includes('633;P;Cwd=') && onWindows.includes('cygpath -w'), onWindows);
+    const onLinux = buildProfileArgs(bash, '/work/app', [], 'linux')?.join(' ') ?? '';
+    assert.ok(!onLinux.includes('633;P;Cwd='), onLinux);
   });
 
   it('execs an interactive shell after the commands (POSIX)', () => {
