@@ -116,6 +116,22 @@ svg {
   text-decoration: underline;
 }
 
+/* "Add command": a dashed, link-coloured button with real padding and a clear hover/click target. */
+.add-row-wrap {
+  margin-top: 4px;
+}
+
+.btn.add-row {
+  padding: 0 14px;
+  border-style: dashed;
+  color: var(--vscode-textLink-foreground);
+}
+
+.btn.add-row:hover:not(:disabled) {
+  border-color: var(--tp-accent);
+  background: color-mix(in srgb, var(--tp-accent) 10%, transparent);
+}
+
 .btn:disabled,
 .icon-btn:disabled {
   opacity: 0.45;

@@ -91,7 +91,7 @@ export function renderWebviewHtml({ nonce, scriptUri, styleUri, cspSource }: Web
           <div class="field wide">
             <label id="commands-label" for="cmd-0">Startup commands <small>optional, run in order</small></label>
             <div id="commands" role="group" aria-labelledby="commands-label"></div>
-            <div><button id="add-command-btn" class="btn link" type="button"></button></div>
+            <div class="add-row-wrap"><button id="add-command-btn" class="btn ghost add-row" type="button"></button></div>
             <div class="error" id="e-commands" role="alert"></div>
           </div>
         </div>
