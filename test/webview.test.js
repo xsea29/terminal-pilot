@@ -170,7 +170,8 @@ test('add form: commands rows (Enter adds, paste splits lines, remove) and submi
   t.host({ type: 'saveResult', requestId: t.last('save').requestId, ok: true });
   assert.strictEqual(t.$('form-view').hidden, true);
   assert.strictEqual(t.$('list-view').hidden, false);
-  assert.strictEqual(t.document.activeElement, t.$('add-btn'));
+  // From the empty state the visible "Add Terminal" button is the one in the empty state (the toolbar is hidden).
+  assert.strictEqual(t.document.activeElement.getAttribute('data-focus-key'), 'empty-add');
 });
 
 test('browse and live directory validation round-trip', (t) => {

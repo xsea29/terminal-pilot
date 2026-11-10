@@ -27,6 +27,8 @@
     plus: `<svg ${STROKE}><path d="M8 3v10M3 8h10"/></svg>`,
     folder: `<svg ${STROKE}><path d="M1.8 3.8h4.2l1.5 1.7h6.7v7.2H1.8z"/></svg>`,
     close: `<svg ${STROKE}><path d="M4 4l8 8M12 4l-8 8"/></svg>`,
+    search: `<svg ${STROKE}><circle cx="7" cy="7" r="4.3"/><path d="M10.3 10.3L14 14"/></svg>`,
+    back: `<svg ${STROKE}><path d="M13 8H3M7 4L3 8l4 4"/></svg>`,
   };
 
   // ---------------------------------------------------------------------------------------------
@@ -133,6 +135,9 @@
   function renderToolbar() {
     const terminals = state.data.terminals;
     const selected = state.selected.size;
+
+    // With nothing configured the empty state offers the one and only "Add Terminal" button.
+    $('toolbar').hidden = !state.loaded || terminals.length === 0;
     buttonContent($('add-btn'), 'plus', 'Add Terminal');
 
     const runBtn = $('run-btn');
@@ -140,12 +145,13 @@
     runBtn.disabled = terminals.length === 0;
 
     const scoped = selected > 0 ? terminals.filter((t) => state.selected.has(t.id)) : terminals;
-    const running = scoped.filter((t) => t.running).length;
     const stopBtn = $('stop-btn');
     buttonContent(stopBtn, 'stop', selected > 0 ? 'Stop selected' : 'Stop all');
-    stopBtn.disabled = running === 0;
+    stopBtn.disabled = scoped.filter((t) => t.running).length === 0;
 
-    $('filter').hidden = terminals.length === 0;
+    const running = terminals.filter((t) => t.running).length;
+    const total = `${terminals.length} terminal${terminals.length === 1 ? '' : 's'}`;
+    $('summary').textContent = running > 0 ? `${total} · ${running} running` : total;
   }
 
   function renderEmptyState() {
@@ -154,10 +160,10 @@
     return el(
       'div',
       { class: 'empty' },
-      el('span', { html: ICONS.terminal, 'aria-hidden': 'true' }),
+      el('div', { class: 'empty-icon', html: ICONS.terminal, 'aria-hidden': 'true' }),
       el('h3', { text: 'No terminals yet' }),
       el('p', {
-        text: 'Create dedicated terminals for your frontend, backend, Git or anything else. Each one opens in its own folder and runs its startup commands for you.',
+        text: 'Create a dedicated terminal for your frontend, backend, Git or anything else. Each one opens in its own folder and runs its startup commands for you.',
       }),
       add
     );
@@ -174,32 +180,41 @@
 
     const shellLabel = (state.data.shells.find((s) => s.id === t.shell) || { label: t.shell }).label;
 
-    const commandCell = el('td', { class: 'col-cmd', title: t.commands.join('\n') });
-    if (t.commands.length === 0) {
-      commandCell.append(el('span', { class: 'muted', text: 'No startup command' }));
-    } else {
-      commandCell.append(el('span', { class: 'mono', text: t.commands[0] }));
-      if (t.commands.length > 1) {
-        commandCell.append(el('span', { class: 'badge', text: `+${t.commands.length - 1}` }));
-      }
-    }
+    const nameCell = el(
+      'td',
+      { class: 'col-name', title: t.name },
+      el(
+        'div',
+        { class: 'name-line' },
+        el('span', { class: 'name', text: t.name }),
+        el('span', { class: 'chip', text: t.scope === 'global' ? 'Global' : 'Workspace' })
+      )
+    );
 
     const cwdCell = el('td', { class: 'col-cwd', title: t.cwd || 'Workspace root' });
     cwdCell.append(
       t.cwd ? el('span', { class: 'mono', text: t.cwd }) : el('span', { class: 'muted', text: '(workspace root)' })
     );
 
-    const nameCell = el('td', { class: 'col-name', title: t.name });
-    nameCell.append(
-      el('strong', { text: t.name }),
-      el('span', { class: 'badge', text: t.scope === 'global' ? 'Global' : 'Workspace' })
-    );
+    const commandCell = el('td', { class: 'col-cmd', title: t.commands.join('\n') });
+    if (t.commands.length === 0) {
+      commandCell.append(el('span', { class: 'muted', text: 'No startup command' }));
+    } else {
+      commandCell.append(el('code', { class: 'cmd', text: t.commands[0] }));
+      if (t.commands.length > 1) {
+        commandCell.append(el('span', { class: 'chip more', text: `+${t.commands.length - 1}` }));
+      }
+    }
 
-    const statusText = t.running ? 'Running' : 'Stopped';
     const statusCell = el(
       'td',
       { class: 'col-status' },
-      el('span', { class: 'status ' + (t.running ? 'running' : 'stopped') }, el('span', { class: 'dot' }), statusText)
+      el(
+        'span',
+        { class: 'status ' + (t.running ? 'running' : 'stopped') },
+        el('span', { class: 'dot' }),
+        t.running ? 'Running' : 'Stopped'
+      )
     );
 
     const actions = el(
@@ -214,7 +229,7 @@
       }),
       t.running
         ? iconButton({ name: 'stop', label: `Stop ${t.name}`, action: 'stop', focusKey: `${t.id}:stop` })
-        : null,
+        : el('span', { class: 'icon-slot', 'aria-hidden': 'true' }), // keeps the other buttons aligned across rows
       iconButton({ name: 'edit', label: `Edit ${t.name}`, action: 'edit', focusKey: `${t.id}:edit` }),
       iconButton({ name: 'copy', label: `Duplicate ${t.name}`, action: 'duplicate', focusKey: `${t.id}:duplicate` }),
       iconButton({ name: 'trash', label: `Delete ${t.name}`, action: 'delete', className: 'danger', focusKey: `${t.id}:delete` })
@@ -252,7 +267,11 @@
     );
     const body = el('tbody');
     rows.forEach((t) => body.append(renderRow(t)));
-    return el('table', { 'aria-label': 'Managed terminals' }, el('thead', null, head), body);
+    return el(
+      'div',
+      { class: 'table-card' },
+      el('table', { 'aria-label': 'Managed terminals' }, el('thead', null, head), body)
+    );
   }
 
   function renderList() {
@@ -263,14 +282,14 @@
 
     let content;
     if (!state.loaded) {
-      content = el('p', { class: 'muted', text: 'Loading…' });
+      content = el('div', { class: 'empty compact' }, el('p', { text: 'Loading…' }));
     } else if (all.length === 0) {
       content = renderEmptyState();
     } else {
       const rows = visibleTerminals();
       content =
         rows.length === 0
-          ? el('div', { class: 'empty' }, el('p', { text: 'No terminals match your filter.' }))
+          ? el('div', { class: 'empty compact' }, el('p', { text: 'No terminals match your filter.' }))
           : renderTable(rows);
     }
     $('list').replaceChildren(content);
@@ -460,7 +479,10 @@
     $('form-view').hidden = true;
     $('list-view').hidden = false;
     renderList();
-    $('add-btn').focus();
+    const visibleAdd = $('toolbar').hidden ? $('list').querySelector('[data-focus-key="empty-add"]') : $('add-btn');
+    if (visibleAdd) {
+      visibleAdd.focus();
+    }
   }
 
   function collectDraft() {
@@ -639,6 +661,9 @@
 
   function init() {
     buttonContent($('add-btn'), 'plus', 'Add Terminal');
+    $('search-icon').innerHTML = ICONS.search;
+    $('back-btn').innerHTML = ICONS.back;
+    $('back-btn').addEventListener('click', closeForm);
     $('filter').value = state.filter;
     $('filter').addEventListener('input', (event) => {
       state.filter = event.target.value;

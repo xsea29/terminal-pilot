@@ -28,18 +28,26 @@ export function renderWebviewHtml({ nonce, scriptUri, styleUri, cspSource }: Web
 <body>
   <main id="app">
     <section id="list-view" aria-label="Managed terminals">
-      <div class="toolbar" role="toolbar" aria-label="Terminal Pilot actions">
+      <div id="toolbar" class="toolbar" role="toolbar" aria-label="Terminal Pilot actions" hidden>
         <button id="add-btn" class="btn primary" type="button"></button>
-        <button id="run-btn" class="btn" type="button"></button>
-        <button id="stop-btn" class="btn" type="button"></button>
-        <input id="filter" class="filter" type="search" placeholder="Filter terminals" aria-label="Filter terminals" />
+        <span class="toolbar-sep" aria-hidden="true"></span>
+        <button id="run-btn" class="btn ghost" type="button"></button>
+        <button id="stop-btn" class="btn ghost" type="button"></button>
+        <span id="summary" class="summary"></span>
+        <div class="search">
+          <span id="search-icon" class="search-icon" aria-hidden="true"></span>
+          <input id="filter" class="filter" type="search" placeholder="Filter terminals" aria-label="Filter terminals" />
+        </div>
       </div>
       <div id="list"></div>
     </section>
 
     <section id="form-view" hidden aria-labelledby="form-title">
       <form id="form" novalidate autocomplete="off">
-        <h2 id="form-title"></h2>
+        <div class="form-head">
+          <button id="back-btn" class="icon-btn" type="button" aria-label="Back to terminals" title="Back to terminals"></button>
+          <h2 id="form-title"></h2>
+        </div>
 
         <div class="grid">
           <div class="field">
@@ -57,7 +65,7 @@ export function renderWebviewHtml({ nonce, scriptUri, styleUri, cspSource }: Web
           <div class="field wide">
             <label for="f-cwd">Working directory</label>
             <div class="row">
-              <input id="f-cwd" type="text" placeholder="Leave empty for the workspace root, or e.g. frontend" aria-describedby="h-cwd e-cwd" />
+              <input id="f-cwd" type="text" placeholder="Workspace root, or e.g. frontend" aria-describedby="h-cwd e-cwd" />
               <button id="browse-btn" class="btn" type="button"></button>
             </div>
             <div class="hint" id="h-cwd">Absolute, or relative to the workspace folder. <code>~</code> and <code>\${workspaceFolder}</code> are supported.</div>
@@ -66,14 +74,22 @@ export function renderWebviewHtml({ nonce, scriptUri, styleUri, cspSource }: Web
 
           <fieldset class="field wide scope" aria-describedby="e-scope">
             <legend>Save configuration in</legend>
-            <label class="radio"><input type="radio" name="scope" value="workspace" /> <span>Workspace <small>only this project</small></span></label>
-            <label class="radio"><input type="radio" name="scope" value="global" /> <span>Global <small>all projects</small></span></label>
+            <div class="cards">
+              <label class="card">
+                <input type="radio" name="scope" value="workspace" />
+                <span class="card-body"><span class="card-title">Workspace</span><span class="card-desc">Only this project. Can be shared through <code>.vscode/settings.json</code>.</span></span>
+              </label>
+              <label class="card">
+                <input type="radio" name="scope" value="global" />
+                <span class="card-body"><span class="card-title">Global</span><span class="card-desc">Available in every VS Code window.</span></span>
+              </label>
+            </div>
             <div class="hint" id="h-scope"></div>
             <div class="error" id="e-scope" role="alert"></div>
           </fieldset>
 
           <div class="field wide">
-            <label id="commands-label" for="cmd-0">Startup commands <small>(optional, run in order)</small></label>
+            <label id="commands-label" for="cmd-0">Startup commands <small>optional, run in order</small></label>
             <div id="commands" role="group" aria-labelledby="commands-label"></div>
             <div><button id="add-command-btn" class="btn link" type="button"></button></div>
             <div class="error" id="e-commands" role="alert"></div>
