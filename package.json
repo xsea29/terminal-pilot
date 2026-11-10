@@ -1,0 +1,179 @@
+{
+  "name": "terminal-pilot",
+  "displayName": "Terminal Pilot",
+  "description": "Create, configure and launch dedicated terminals (frontend, backend, git, ...) from a graphical panel - no settings.json editing required.",
+  "version": "1.0.0",
+  "publisher": "terminal-pilot",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "terminal",
+    "shell",
+    "profiles",
+    "workspace",
+    "productivity"
+  ],
+  "main": "./out/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Workspace-scoped terminals (which run commands stored in the workspace) are disabled until the workspace is trusted.",
+      "restrictedConfigurations": [
+        "terminalPilot.terminals"
+      ]
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Terminal Pilot launches local terminals and needs a local file system."
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "terminalPilot",
+          "title": "Terminal Pilot",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "terminalPilot": [
+        {
+          "type": "webview",
+          "id": "terminalPilot.view",
+          "name": "Terminal Pilot"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "terminalPilot.add",
+        "title": "Add Terminal",
+        "category": "Terminal Pilot",
+        "icon": "$(add)"
+      },
+      {
+        "command": "terminalPilot.run",
+        "title": "Run Terminal...",
+        "category": "Terminal Pilot",
+        "icon": "$(play)"
+      },
+      {
+        "command": "terminalPilot.runAll",
+        "title": "Run All Terminals",
+        "category": "Terminal Pilot",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "terminalPilot.stopAll",
+        "title": "Stop All Managed Terminals",
+        "category": "Terminal Pilot",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "terminalPilot.focus",
+        "title": "Show Terminal Pilot",
+        "category": "Terminal Pilot"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "terminalPilot.add",
+          "when": "view == terminalPilot.view",
+          "group": "navigation@1"
+        },
+        {
+          "command": "terminalPilot.runAll",
+          "when": "view == terminalPilot.view",
+          "group": "navigation@2"
+        },
+        {
+          "command": "terminalPilot.stopAll",
+          "when": "view == terminalPilot.view",
+          "group": "navigation@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Terminal Pilot",
+      "properties": {
+        "terminalPilot.terminals": {
+          "type": "array",
+          "scope": "window",
+          "default": [],
+          "markdownDescription": "Terminals managed by **Terminal Pilot**. This list is maintained by the Terminal Pilot panel - you normally never need to edit it by hand.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Stable unique identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name of the terminal."
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Working directory. Absolute, or relative to the workspace folder. Empty means the workspace root."
+              },
+              "commands": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Startup commands, executed in order after the terminal is created."
+              },
+              "shell": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "powershell",
+                  "bash",
+                  "zsh"
+                ],
+                "default": "default",
+                "description": "Shell to use."
+              }
+            }
+          }
+        },
+        "terminalPilot.syncTerminalProfiles": {
+          "type": "boolean",
+          "scope": "window",
+          "default": true,
+          "markdownDescription": "Also generate a `TP: <name>` entry in `terminal.integrated.profiles.*` for each managed terminal, so it can be opened from the terminal dropdown. Only entries created by this extension are touched."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test:unit": "node --test out/test/unit",
+    "test:integration": "node out/test/integration/runTests.js",
+    "test": "npm run compile && npm run test:unit && npm run test:webview && npm run test:integration",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --allow-missing-repository",
+    "test:webview": "node test/webview.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.2.0",
+    "jsdom": "^25.0.0",
+    "typescript": "^5.5.0"
+  }
+}
