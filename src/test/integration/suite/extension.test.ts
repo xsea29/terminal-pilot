@@ -134,6 +134,7 @@ export const tests: TestCase[] = [
         const entry = profiles[`${PROFILE_PREFIX}FRONTEND`];
         assert.ok(entry, 'profile for FRONTEND missing');
         assert.ok(entry.path && Array.isArray(entry.args));
+        assert.strictEqual(entry.overrideName, true, 'tabs would all show the shell name instead of the profile name');
         assert.strictEqual(entry.env.TERMINAL_PILOT_ID, ids.FRONTEND);
       }
     },

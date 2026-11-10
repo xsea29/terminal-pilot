@@ -104,6 +104,9 @@ export class ProfileService implements vscode.Disposable {
         path: shell.path,
         args,
         icon: 'terminal',
+        // Without this VS Code titles the tab after the running process, so every profile would show the
+        // same shell name ("powershell", "bash", ...) instead of its own.
+        overrideName: true,
         env: { [TERMINAL_ID_ENV]: terminal.id },
       };
     }
