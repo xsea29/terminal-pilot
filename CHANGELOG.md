@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- Added the extension icon.
+
 ## 1.1.0
 
 ### Added

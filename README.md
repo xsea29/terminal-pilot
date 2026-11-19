@@ -103,10 +103,10 @@ npm install
 npm run package          # compiles, then runs: vsce package
 ```
 
-This produces `termora-1.1.0.vsix`. Install it with:
+This produces `termora-1.1.1.vsix`. Install it with:
 
 ```bash
-code --install-extension termora-1.1.0.vsix
+code --install-extension termora-1.1.1.vsix
 ```
 
 or in VS Code: **Extensions** view → `…` menu → **Install from VSIX…**.
