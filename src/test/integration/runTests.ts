@@ -71,7 +71,13 @@ async function main(): Promise<void> {
       ],
     });
   } finally {
-    fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+    // Best effort: VS Code's crash reporter can still hold a file for a moment after the tests finish,
+    // and a locked temp folder must not turn a passing run into a failure.
+    try {
+      fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+    } catch (error) {
+      console.warn(`Could not delete the temporary test folder (${root}): ${(error as Error).message}`);
+    }
   }
 }
 

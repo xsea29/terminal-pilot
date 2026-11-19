@@ -1,9 +1,9 @@
 {
-  "name": "terminal-pilot",
-  "displayName": "Terminal Pilot",
+  "name": "termora",
+  "displayName": "Termora",
   "description": "Create, configure and launch dedicated terminals (frontend, backend, git, ...) from a graphical panel - no settings.json editing required.",
-  "version": "1.0.0",
-  "publisher": "terminal-pilot",
+  "version": "1.1.0",
+  "publisher": "quorvax",
   "license": "MIT",
   "engines": {
     "vscode": "^1.90.0"
@@ -47,7 +47,8 @@
         {
           "type": "webview",
           "id": "terminalPilot.view",
-          "name": "Terminal Pilot"
+          "name": "Terminal Pilot",
+          "icon": "media/icon.svg"
         }
       ]
     },

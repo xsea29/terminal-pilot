@@ -156,7 +156,7 @@ test('add form: commands rows (Enter adds, paste splits lines, remove) and submi
   assert.deepStrictEqual([...rows()].map((r) => r.value), ['npm install', 'npm run build', 'npm run dev']);
   assert.deepStrictEqual([...rows()].map((r) => r.id), ['cmd-0', 'cmd-1', 'cmd-2']);
 
-  t.click(rows()[1].parentElement.querySelector('button')); // remove "npm run build"
+  t.click(rows()[1].parentElement.querySelector('.remove')); // remove "npm run build"
   assert.deepStrictEqual([...rows()].map((r) => r.value), ['npm install', 'npm run dev']);
 
   t.click(t.document.querySelector('input[name="scope"][value="global"]'));
@@ -172,6 +172,118 @@ test('add form: commands rows (Enter adds, paste splits lines, remove) and submi
   assert.strictEqual(t.$('list-view').hidden, false);
   // From the empty state the visible "Add Terminal" button is the one in the empty state (the toolbar is hidden).
   assert.strictEqual(t.document.activeElement.getAttribute('data-focus-key'), 'empty-add');
+});
+
+test('a blank startup command is refused: only that box turns red, and it clears when typing', (t) => {
+  t.host(state([]));
+  t.click(t.$('add-btn'));
+  t.type(t.$('f-name'), 'X');
+  const boxes = () => [...t.$('commands').querySelectorAll('input')];
+  const red = () => boxes().map((i) => i.getAttribute('aria-invalid') === 'true');
+
+  // "Add command" with the only (empty) box: no new row, that box turns red
+  t.click(t.$('add-command-btn'));
+  assert.strictEqual(boxes().length, 1);
+  assert.deepStrictEqual(red(), [true]);
+  t.type(boxes()[0], 'npm install');
+  assert.deepStrictEqual(red(), [false], 'typing clears the red outline');
+
+  // Enter on an empty box behaves the same
+  t.click(t.$('add-command-btn'));
+  assert.strictEqual(boxes().length, 2);
+  t.key(boxes()[1], 'Enter');
+  assert.strictEqual(boxes().length, 2);
+  assert.deepStrictEqual(red(), [false, true], 'only the empty box is outlined');
+
+  // Saving with an empty box between others is refused; nothing is sent
+  const before = t.sent.filter((m) => m.type === 'save').length;
+  t.$('form').dispatchEvent(new t.window.Event('submit', { cancelable: true }));
+  assert.strictEqual(t.sent.filter((m) => m.type === 'save').length, before);
+  assert.strictEqual(t.$('save-btn').disabled, false);
+  assert.strictEqual(t.document.activeElement, boxes()[1]);
+
+  // Fill it in and it saves
+  t.type(boxes()[1], 'npm run dev');
+  t.$('form').dispatchEvent(new t.window.Event('submit', { cancelable: true }));
+  assert.deepStrictEqual(t.last('save').draft.commands, ['npm install', 'npm run dev']);
+});
+
+test('a single empty box is still allowed (a terminal without startup commands)', (t) => {
+  t.host(state([]));
+  t.click(t.$('add-btn'));
+  t.type(t.$('f-name'), 'PLAIN');
+  t.$('form').dispatchEvent(new t.window.Event('submit', { cancelable: true }));
+  assert.deepStrictEqual(t.last('save').draft.commands, ['']);
+});
+
+test('startup commands can be reordered (keyboard) and the saved order follows', (t) => {
+  t.host(state([term({ name: 'API', commands: ['one', 'two', 'three'], scope: 'global' })]));
+  t.click(t.document.querySelector('[aria-label="Edit API"]'));
+  const values = () => [...t.$('commands').querySelectorAll('input')].map((i) => i.value);
+  const grip = (n) => t.$('commands').querySelectorAll('.grip')[n];
+  assert.deepStrictEqual(values(), ['one', 'two', 'three']);
+
+  t.key(grip(2), 'ArrowUp'); // three moves above two
+  assert.deepStrictEqual(values(), ['one', 'three', 'two']);
+  assert.strictEqual(t.document.activeElement, grip(1), 'focus stays on the moved row');
+  t.key(grip(0), 'ArrowUp'); // already first: nothing happens
+  assert.deepStrictEqual(values(), ['one', 'three', 'two']);
+
+  const input = t.$('commands').querySelectorAll('input')[0];
+  t.key(input, 'ArrowDown'); // plain arrow in the text box must not reorder
+  assert.deepStrictEqual(values(), ['one', 'three', 'two']);
+  t.key(input, 'ArrowDown', { altKey: true }); // Alt+Down moves "one" down
+  assert.deepStrictEqual(values(), ['three', 'one', 'two']);
+  assert.deepStrictEqual([...t.$('commands').querySelectorAll('input')].map((i) => i.id), ['cmd-0', 'cmd-1', 'cmd-2']);
+
+  t.$('form').dispatchEvent(new t.window.Event('submit', { cancelable: true }));
+  assert.deepStrictEqual(t.last('save').draft.commands, ['three', 'one', 'two']);
+  assert.strictEqual(t.last('save').editingId, 'id-API');
+});
+
+test('startup commands can be reordered by dragging the grip; a single row has no grip', (t) => {
+  t.host(state([term({ name: 'API', commands: ['one', 'two', 'three'], scope: 'global' })]));
+  t.click(t.document.querySelector('[aria-label="Edit API"]'));
+  const values = () => [...t.$('commands').querySelectorAll('input')].map((i) => i.value);
+
+  // jsdom has no layout: give every row a 40px slot based on its position.
+  const ROW = 40;
+  Object.defineProperty(t.window.HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => ROW });
+  t.window.HTMLElement.prototype.getBoundingClientRect = function () {
+    const index = [...this.parentElement.children].indexOf(this);
+    return { top: index * ROW, bottom: index * ROW + ROW, left: 0, right: 100, width: 100, height: ROW };
+  };
+  const mouse = (type, y) => new t.window.MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientY: y });
+
+  const first = t.$('commands').children[0];
+  first.querySelector('.grip').dispatchEvent(mouse('pointerdown', 20));
+  assert.ok(first.classList.contains('dragging'));
+  t.window.dispatchEvent(mouse('pointermove', 30)); // still inside its own slot
+  assert.deepStrictEqual(values(), ['one', 'two', 'three']);
+  t.window.dispatchEvent(mouse('pointermove', 110)); // dragged past the last row's middle
+  assert.deepStrictEqual(values(), ['two', 'three', 'one']);
+  t.window.dispatchEvent(mouse('pointermove', 5)); // and back to the top
+  assert.deepStrictEqual(values(), ['one', 'two', 'three']);
+  t.window.dispatchEvent(mouse('pointermove', 70)); // past the middle of the next row: down by one
+  t.window.dispatchEvent(mouse('pointerup', 70));
+  assert.deepStrictEqual(values(), ['two', 'one', 'three']);
+  assert.ok(!first.classList.contains('dragging'));
+  t.window.dispatchEvent(mouse('pointermove', 5)); // listeners are gone after the drop
+  assert.deepStrictEqual(values(), ['two', 'one', 'three']);
+
+  t.$('form').dispatchEvent(new t.window.Event('submit', { cancelable: true }));
+  assert.deepStrictEqual(t.last('save').draft.commands, ['two', 'one', 'three']);
+
+  // With only one row there is nothing to reorder.
+  t.host({ type: 'saveResult', requestId: t.last('save').requestId, ok: true });
+  t.click(t.$('add-btn'));
+  const lone = t.$('commands').querySelector('.grip');
+  assert.ok(lone, 'the grip stays visible so the row layout does not shift');
+  assert.strictEqual(lone.disabled, true);
+  t.key(t.$('commands').querySelector('input'), 'Enter'); // empty row: no second row yet
+  t.type(t.$('commands').querySelector('input'), 'x');
+  t.key(t.$('commands').querySelector('input'), 'Enter');
+  assert.deepStrictEqual([...t.$('commands').querySelectorAll('.grip')].map((g) => g.disabled), [false, false]);
 });
 
 test('browse and live directory validation round-trip', (t) => {
@@ -231,9 +343,23 @@ test('toast shows messages, announces errors assertively and offers Undo', (t) =
   t.host({ type: 'toast', kind: 'success', text: 'Deleted "A".', undo: true });
   assert.strictEqual(t.$('toast').hidden, false);
   assert.match(t.$('toast').textContent, /Deleted "A"/);
-  t.click(t.$('toast').querySelector('button'));
+  assert.ok(t.$('toast').querySelector('.toast-icon svg'), 'has a status icon');
+  assert.ok(t.$('toast').querySelector('.toast-timer'), 'an undo toast shows the countdown bar');
+  assert.strictEqual(t.$('toast').querySelector('.toast-undo').textContent, 'Undo');
+  t.click(t.$('toast').querySelector('.toast-undo'));
   assert.deepStrictEqual(t.last('undoDelete'), { type: 'undoDelete' });
   assert.strictEqual(t.$('toast').hidden, true);
+
+  // The dismiss button closes the toast without undoing anything.
+  const undos = t.sent.filter((m) => m.type === 'undoDelete').length;
+  t.host({ type: 'toast', kind: 'success', text: 'Deleted "B".', undo: true });
+  t.click(t.$('toast').querySelector('.toast-close'));
+  assert.strictEqual(t.$('toast').hidden, true);
+  assert.strictEqual(t.sent.filter((m) => m.type === 'undoDelete').length, undos);
+
+  // Plain toasts have no Undo and no countdown.
+  t.host({ type: 'toast', kind: 'info', text: 'Saved.' });
+  assert.ok(!t.$('toast').querySelector('.toast-undo') && !t.$('toast').querySelector('.toast-timer'));
 
   t.host({ type: 'toast', kind: 'error', text: 'Nope' });
   assert.strictEqual(t.$('toast').getAttribute('aria-live'), 'assertive');

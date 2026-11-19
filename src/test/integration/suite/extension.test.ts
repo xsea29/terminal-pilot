@@ -59,7 +59,7 @@ export const tests: TestCase[] = [
   {
     name: 'activates and exposes the Terminal Pilot view',
     async fn() {
-      const extension = vscode.extensions.getExtension('terminal-pilot.terminal-pilot');
+      const extension = vscode.extensions.getExtension('quorvax.termora');
       assert.ok(extension, 'extension not found');
       api = (await extension.activate()) as TerminalPilotApi;
       assert.ok(api.controller);
@@ -196,6 +196,27 @@ export const tests: TestCase[] = [
       const file = path.join(workspaceDir, 'electron', 'order.txt');
       await waitFor(() => fs.existsSync(file) && fs.readFileSync(file, 'utf8').length >= 3, 'three commands to finish');
       assert.strictEqual(fs.readFileSync(file, 'utf8'), '123');
+    },
+  },
+
+  {
+    name: 'reordering startup commands in an edit is stored and used on the next run',
+    async fn() {
+      const id = await mustSave(
+        draft('REORDER', 'electron', [NODE_WRITE('reorder.txt', 'a'), NODE_WRITE('reorder.txt', 'b'), NODE_WRITE('reorder.txt', 'c')])
+      );
+      const [a, b, c] = api.controller.list().find((t) => t.id === id)!.commands;
+      const outcome = await api.controller.save(draft('REORDER', 'electron', [c, a, b]), id);
+      assert.ok(outcome.ok, JSON.stringify(outcome));
+
+      const stored = vscode.workspace.getConfiguration('terminalPilot').inspect<Array<{ id: string; commands: string[] }>>('terminals');
+      assert.deepStrictEqual(stored?.workspaceValue?.find((t) => t.id === id)?.commands, [c, a, b], 'settings.json must hold the new order');
+
+      await api.controller.run(id);
+      const file = path.join(workspaceDir, 'electron', 'reorder.txt');
+      await waitFor(() => fs.existsSync(file) && fs.readFileSync(file, 'utf8').length >= 3, 'three commands to finish');
+      assert.strictEqual(fs.readFileSync(file, 'utf8'), 'cab');
+      api.controller.stop(id);
     },
   },
 

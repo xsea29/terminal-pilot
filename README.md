@@ -1,4 +1,6 @@
-# Terminal Pilot
+# Termora
+
+> Inside VS Code the panel tab, commands and settings are called **Terminal Pilot**.
 
 Create, configure and launch **dedicated terminals** (frontend, backend, Electron, Git, database, …) from a graphical panel in VS Code. You never have to edit `settings.json` by hand.
 
@@ -7,11 +9,12 @@ Create, configure and launch **dedicated terminals** (frontend, backend, Electro
 - **Terminal Pilot tab in the bottom panel**, next to Terminal, Problems, Output and Debug Console.
 - Table of terminals: name, working directory, startup command, shell, **running / stopped** status, and Run, Stop, Edit, Duplicate and Delete buttons.
 - **Add Terminal** form: name, working directory (with a native folder browser), shell (Default, PowerShell, Bash, Zsh), any number of startup commands, and scope.
+- **Reorder startup commands**: drag a command by its grip (⋮⋮) in the form, or use the up/down arrow keys on the grip (Alt+Up/Down inside the text box). The saved order is the run order. A blank command is refused: its box turns red until you type something or remove it.
 - **Global or Workspace scope**: global terminals follow you everywhere, workspace terminals live in the project (and can be shared through `.vscode/settings.json`).
 - **Run focuses instead of duplicating**: if the terminal is already running, Run brings it to the front.
 - **Stop** a terminal, **Run all / Run selected**, **Stop all / Stop selected**.
 - **Survives restarts**: definitions live in settings, and running terminals are re-attached after a window reload.
-- Delete has no confirmation dialog; it offers **Undo** instead.
+- Delete has no confirmation dialog; a toast with an **Undo** button (and a countdown bar) appears instead.
 - Also available from the Command Palette: *Terminal Pilot: Add Terminal / Run Terminal… / Run All Terminals / Stop All Managed Terminals*.
 - Works on Windows, Linux and macOS, in light, dark and high-contrast themes, with full keyboard support.
 
@@ -100,10 +103,10 @@ npm install
 npm run package          # compiles, then runs: vsce package
 ```
 
-This produces `terminal-pilot-1.0.0.vsix`. Install it with:
+This produces `termora-1.1.0.vsix`. Install it with:
 
 ```bash
-code --install-extension terminal-pilot-1.0.0.vsix
+code --install-extension termora-1.1.0.vsix
 ```
 
 or in VS Code: **Extensions** view → `…` menu → **Install from VSIX…**.

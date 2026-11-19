@@ -27,8 +27,12 @@
     plus: `<svg ${STROKE}><path d="M8 3v10M3 8h10"/></svg>`,
     folder: `<svg ${STROKE}><path d="M1.8 3.8h4.2l1.5 1.7h6.7v7.2H1.8z"/></svg>`,
     close: `<svg ${STROKE}><path d="M4 4l8 8M12 4l-8 8"/></svg>`,
+    grip: '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="6" cy="4" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="6" cy="8" r="1.2"/><circle cx="10" cy="8" r="1.2"/><circle cx="6" cy="12" r="1.2"/><circle cx="10" cy="12" r="1.2"/></svg>',
     search: `<svg ${STROKE}><circle cx="7" cy="7" r="4.3"/><path d="M10.3 10.3L14 14"/></svg>`,
     back: `<svg ${STROKE}><path d="M13 8H3M7 4L3 8l4 4"/></svg>`,
+    ok: `<svg ${STROKE}><circle cx="8" cy="8" r="6.2"/><path d="M5.4 8.2l1.8 1.8 3.4-3.7"/></svg>`,
+    info: `<svg ${STROKE}><circle cx="8" cy="8" r="6.2"/><path d="M8 7.3v3.6M8 5.1v.1"/></svg>`,
+    error: `<svg ${STROKE}><circle cx="8" cy="8" r="6.2"/><path d="M6.1 6.1l3.8 3.8M9.9 6.1l-3.8 3.8"/></svg>`,
   };
 
   // ---------------------------------------------------------------------------------------------
@@ -356,18 +360,91 @@
     inputs.forEach((input, index) => {
       input.id = `cmd-${index}`;
       input.setAttribute('aria-label', `Startup command ${index + 1}`);
-      const remove = input.parentElement.querySelector('button');
+      const remove = input.parentElement.querySelector('.remove');
       remove.setAttribute('aria-label', `Remove startup command ${index + 1}`);
       remove.title = 'Remove command';
+      const grip = input.parentElement.querySelector('.grip');
+      grip.setAttribute('aria-label', `Move startup command ${index + 1} (drag, or use the up and down arrow keys)`);
+      grip.disabled = inputs.length < 2;
+      grip.title = grip.disabled ? 'Add another command to reorder' : 'Drag to reorder';
     });
     $('commands-label').setAttribute('for', 'cmd-0');
+  }
+
+  /** Moves a row one place up (-1) or down (1); the saved order is simply the DOM order. */
+  function moveRow(row, direction) {
+    const other = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
+    if (!other) {
+      return false;
+    }
+    const before = other.getBoundingClientRect().top;
+    if (direction < 0) {
+      other.before(row);
+    } else {
+      other.after(row);
+    }
+    const shift = before - other.getBoundingClientRect().top;
+    if (shift && other.animate) {
+      other.animate([{ transform: `translateY(${shift}px)` }, { transform: 'none' }], { duration: 140, easing: 'ease-out' });
+    }
+    renumberCommands();
+    return true;
+  }
+
+  /** Drag a row by its grip: it swaps places as the pointer crosses its neighbours. */
+  function enableReorder(row, grip) {
+    grip.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 || grip.disabled) {
+        return;
+      }
+      event.preventDefault();
+      grip.focus();
+      row.classList.add('dragging');
+      const move = (e) => {
+        for (;;) {
+          const up = row.previousElementSibling;
+          const down = row.nextElementSibling;
+          if (up && e.clientY < up.getBoundingClientRect().top + up.offsetHeight / 2) {
+            moveRow(row, -1);
+          } else if (down && e.clientY > down.getBoundingClientRect().top + down.offsetHeight / 2) {
+            moveRow(row, 1);
+          } else {
+            return;
+          }
+        }
+      };
+      const stop = () => {
+        row.classList.remove('dragging');
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', stop);
+        window.removeEventListener('pointercancel', stop);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', stop);
+      window.addEventListener('pointercancel', stop);
+    });
+
+    // Keyboard: arrow keys on the grip, or Alt+Up / Alt+Down inside the text box.
+    const onKey = (event, requireAlt) => {
+      const direction = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+      if (!direction || (requireAlt && !event.altKey)) {
+        return;
+      }
+      event.preventDefault();
+      moveRow(row, direction);
+      (requireAlt ? row.querySelector('input') : grip).focus();
+    };
+    grip.addEventListener('keydown', (event) => onKey(event, false));
+    row.querySelector('input').addEventListener('keydown', (event) => onKey(event, true));
   }
 
   function addCommandRow(value) {
     const input = el('input', { type: 'text', placeholder: 'e.g. npm run dev', spellcheck: 'false' });
     input.value = value || '';
-    const remove = el('button', { type: 'button', class: 'icon-btn', html: ICONS.close });
-    const row = el('div', { class: 'command-row' }, input, remove);
+    const grip = el('button', { type: 'button', class: 'icon-btn grip', html: ICONS.grip });
+    const remove = el('button', { type: 'button', class: 'icon-btn remove', html: ICONS.close });
+    const row = el('div', { class: 'command-row' }, grip, input, remove);
+    enableReorder(row, grip);
 
     remove.addEventListener('click', () => {
       const inputs = commandInputs();
@@ -383,15 +460,20 @@
       (remaining[Math.max(0, index - 1)] || $('add-command-btn')).focus();
     });
 
+    // The red outline goes away as soon as the user types something.
+    input.addEventListener('input', () => input.removeAttribute('aria-invalid'));
+
     input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey) {
         event.preventDefault(); // Enter adds the next row instead of submitting
-        if (input.value.trim() !== '') {
-          const next = addCommandRow('');
-          row.after(next.row);
-          renumberCommands();
-          next.input.focus();
+        if (input.value.trim() === '') {
+          input.setAttribute('aria-invalid', 'true'); // a blank command cannot be added
+          return;
         }
+        const next = addCommandRow('');
+        row.after(next.row);
+        renumberCommands();
+        next.input.focus();
       }
     });
 
@@ -407,6 +489,7 @@
         return;
       }
       input.value = lines[0];
+      input.removeAttribute('aria-invalid');
       let anchor = row;
       lines.slice(1).forEach((line) => {
         const created = addCommandRow(line);
@@ -418,6 +501,16 @@
     });
 
     return { row, input };
+  }
+
+  /** Outlines every empty command box in red and focuses the first one. Returns true if there was one. */
+  function flagBlankCommands() {
+    const blanks = commandInputs().filter((i) => i.value.trim() === '');
+    blanks.forEach((i) => i.setAttribute('aria-invalid', 'true'));
+    if (blanks.length > 0) {
+      blanks[0].focus();
+    }
+    return blanks.length > 0;
   }
 
   function appendCommandRow(value) {
@@ -542,6 +635,10 @@
     if (!state.form || state.form.saving) {
       return;
     }
+    // One empty box just means "no startup command"; an empty box between others is a mistake.
+    if (commandInputs().length > 1 && flagBlankCommands()) {
+      return;
+    }
     state.form.saving = true;
     $('save-btn').disabled = true;
     const requestId = ++state.requestSeq;
@@ -588,14 +685,23 @@
     toast.setAttribute('role', kind === 'error' ? 'alert' : 'status');
     toast.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
 
-    const children = [el('span', { class: 'msg', text })];
+    const children = [
+      el('span', { class: 'toast-icon', html: ICONS[kind === 'error' ? 'error' : kind === 'info' ? 'info' : 'ok'] }),
+      el('span', { class: 'msg', text }),
+    ];
     if (undo) {
-      const button = el('button', { type: 'button', class: 'btn link', text: 'Undo' });
+      const button = el('button', { type: 'button', class: 'toast-undo', text: 'Undo' });
       button.addEventListener('click', () => {
         post({ type: 'undoDelete' });
         hideToast();
       });
       children.push(button);
+    }
+    const close = el('button', { type: 'button', class: 'icon-btn toast-close', html: ICONS.close, title: 'Dismiss', 'aria-label': 'Dismiss' });
+    close.addEventListener('click', hideToast);
+    children.push(close);
+    if (undo) {
+      children.push(el('span', { class: 'toast-timer' })); // shrinks over the undo window (see styles.css)
     }
     toast.replaceChildren(...children);
     toast.hidden = false;
@@ -685,7 +791,11 @@
     $('form').addEventListener('submit', submitForm);
     $('cancel-btn').addEventListener('click', closeForm);
     $('browse-btn').addEventListener('click', () => post({ type: 'browse', current: $('f-cwd').value, scope: selectedScope() }));
-    $('add-command-btn').addEventListener('click', () => appendCommandRow('').focus());
+    $('add-command-btn').addEventListener('click', () => {
+      if (!flagBlankCommands()) {
+        appendCommandRow('').focus();
+      }
+    });
 
     $('f-name').addEventListener('input', () => setError('name', ''));
     // Don't nag about an empty name just because focus left the (auto-focused) field; submit reports it.
