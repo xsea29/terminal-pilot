@@ -10,3 +10,4 @@ index.js
 **/*.ts
 .gitignore
 .vscodeignore
+assets/**

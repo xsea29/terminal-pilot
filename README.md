@@ -4,6 +4,8 @@
 
 Create, configure and launch **dedicated terminals** (frontend, backend, Electron, Git, database, …) from a graphical panel in VS Code. You never have to edit `settings.json` by hand.
 
+![Termora demo: create terminals, reorder their startup commands, and run everything with one click](https://raw.githubusercontent.com/xsea29/terminal-pilot/main/assets/termora.gif)
+
 ## Features
 
 - **Terminal Pilot tab in the bottom panel**, next to Terminal, Problems, Output and Debug Console.
@@ -103,10 +105,10 @@ npm install
 npm run package          # compiles, then runs: vsce package
 ```
 
-This produces `termora-1.1.1.vsix`. Install it with:
+This produces `termora-1.1.2.vsix`. Install it with:
 
 ```bash
-code --install-extension termora-1.1.1.vsix
+code --install-extension termora-1.1.2.vsix
 ```
 
 or in VS Code: **Extensions** view → `…` menu → **Install from VSIX…**.

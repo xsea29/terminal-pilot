@@ -2,7 +2,7 @@
   "name": "termora",
   "displayName": "Termora",
   "description": "Create, configure and launch dedicated terminals (frontend, backend, git, ...) from a graphical panel - no settings.json editing required.",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "publisher": "quorvax",
   "license": "MIT",
   "engines": {

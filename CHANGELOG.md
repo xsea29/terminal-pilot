@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2
+
+- Added a short demo animation to the README.
+
 ## 1.1.1
 
 - Added the extension icon.
